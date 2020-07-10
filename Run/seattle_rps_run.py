@@ -12,5 +12,5 @@ os.chdir(data_wd)
 spark = SparkSession.builder.getOrCreate()
 
 # Read in csv files
-rps_spark = spark.read.csv("EXTR_RPSale.csv")
-rb_spark = spark.read.csv("EXTR_ResBldg.csv")
+rps_spark = spark.read.csv("EXTR_RPSale.csv", header = True)
+rb_spark = spark.read.csv("EXTR_ResBldg.csv", header = True)	

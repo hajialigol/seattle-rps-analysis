@@ -2,8 +2,8 @@
 # Remove all variables
 rm(list=ls())
 
+# load Spark library
 library(sparklyr)
-
 
 # Preset Variables for run script
 latest_date = "" # Enter date here
@@ -12,12 +12,12 @@ data_wd = ""
 connection_type = ""
 
 # Load all source script functions
-# source("~/GitHub/seattle-rps-analysis/Functions/FinancialProcessing/inflation_stock_source.R")
-# source("~/GitHub/seattle-rps-analysis/Functions/Geocoding/zipcode_geocode_source.R")
-# source("~/GitHub/seattle-rps-analysis/Functions/RPSProcessing/seattle_rps_source.R")
-# source("~/GitHub/seattle-rps-analysis/Functions/Analytics/price_integral_source.R")
-# source("~/GitHub/seattle-rps-analysis/Functions/Visualizations/price_comparison_source.R")
-# source("~/GitHub/seattle-rps-analysis/Run/seattle_rps_compiler.R")
+source("~/GitHub/seattle-rps-analysis/Functions/FinancialProcessing/inflation_stock_source.R")
+source("~/GitHub/seattle-rps-analysis/Functions/Geocoding/zipcode_geocode_source.R")
+source("~/GitHub/seattle-rps-analysis/Functions/RPSProcessing/seattle_rps_source.R")
+source("~/GitHub/seattle-rps-analysis/Functions/Analytics/price_integral_source.R")
+source("~/GitHub/seattle-rps-analysis/Functions/Visualizations/price_comparison_source.R")
+source("~/GitHub/seattle-rps-analysis/Run/seattle_rps_compiler.R")
 
 # Load in data to start for full-run
 setwd(data_wd)
@@ -27,8 +27,8 @@ setwd(data_wd)
 sc <- spark_connect(master = connection_type)
 
 # Initial Processing
-rpsDf <- spark_read_csv(sc = sc, path = "EXTR_RPSale.csv", stringsAsFactors = FALSE)
-rbDf <- spark_read_csv(sc = sc, path = "EXTR_ResBldg.csv", stringsAsFactors = FALSE)
+rpsDf <- read.csv("EXTR_RPSale.csv", stringsAsFactors = FALSE)
+rbDf <- read.csv("EXTR_ResBldg.csv", stringsAsFactors = FALSE)
 
 rps_spark <- copy_to(sc, rpsDf)
 rb_spark <- copy_to(sc, rbDf)

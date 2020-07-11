@@ -9,7 +9,7 @@ require(data.table)
 #   - tickers [vector]: stock ticker values to create a data frame out of
 # Oupt:
 #   - mergeDf [df]: data frame of stock tickers and adjust price and volume values
-createTickerDf <- function(tickers){
+createTickerDf <- function(tickers, sc){
 
   # Set up environment to create df
   stockEnv <- new.env()
@@ -26,7 +26,9 @@ createTickerDf <- function(tickers){
   # Merge data frames
   mergeDf <- cbind(stockDf, stockVol)
   
-  return(mergeDf)
+  mergeDf_spark <- copy_to(sc, mergeDf)
+  
+  return(mergeDf_spark)
   
 }
 
@@ -43,7 +45,7 @@ createTickerDf <- function(tickers){
 # Oupt:
 #   - dataFrame [df]: updated data frame with prices adjusted to user
 #                     defined year dollars
-yearlyInflationRef <- function(startYear, dataFrame, columnYearName, targetColumn, inflationYear){
+yearlyInflationRef <- function(startYear, spark_dataFrame, columnYearName, targetColumn, inflationYear, sc){
   
   require(quantmod)
   
@@ -69,12 +71,21 @@ yearlyInflationRef <- function(startYear, dataFrame, columnYearName, targetColum
                           stringsAsFactors = FALSE)
   colnames(inflDf)[1] <- columnYearName
   
-  dataFrame <- dataFrame %>% inner_join(inflDf, by = columnYearName)
+  # Convert to Spark df
+  inflDf_spark <- copy_to(sc, inflDf)
   
+  # Inner join the Spark dataframes
+  spark_dataFrame <- spark_dataFrame %>%
+    inner_join(inflDf_spark, by = columnYearName)
+  
+  # Create name for new target column
   newTargetColName <- paste0(targetColumn, paste0(inflationYear, "_Dollars"))
   
-  dataFrame[,newTargetColName] <- dataFrame[,targetColumn] * dataFrame$InflConversionFactor
   
-  return(dataFrame)
+  # Create new target column
+  spark_dataFrame <- spark_dataFrame %>%
+    mutate(newTargetColName = (SalePrice * InflConversionFactor))
+  
+  return (spark_dataFrame)
   
 }

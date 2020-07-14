@@ -47,7 +47,7 @@ def yearlyInflationRef(startYear = 2007, spark_dataFrame = rps_spark, columnYear
     return spark_dataFrame
 
 
-    def yearly_returns(df):    
+def yearly_returns(df):    
     '''
     Desc: 
       function that outputs yearly returns

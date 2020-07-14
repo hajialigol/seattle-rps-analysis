@@ -1,3 +1,19 @@
+def createTickerDf(tickers = tickers, startYear = '2007-01-01', endYear = '2019-12-31'):
+    '''
+    Desc: 
+      This function takes in a vector of stock tickers to merge into a data frame 
+      that contains the daily adjusted prices and trading volume
+    Inpt:
+      - tickers [vector]: stock ticker values to create a data frame out of
+    Oupt:
+      - mergeDf [df]: data frame of stock tickers and adjust price and volume values
+    '''
+    dataFrame = pdf.get_data_yahoo(tickers, start = startYear, end = endYear)
+    stock_dataFrame = dataFrame[['Adj Close', 'Volume']]
+    stock_dataFrame['Years'] = stock_dataFrame.index.year
+    return stock_dataFrame
+
+
 def yearlyInflationRef(startYear = 2007, spark_dataFrame = rps_spark, columnYearName = "Years",
                        targetColumn = "SalePrice", inflationYear = 2019, spark = spark):
     '''
@@ -29,3 +45,15 @@ def yearlyInflationRef(startYear = 2007, spark_dataFrame = rps_spark, columnYear
     spark_dataFrame = spark_dataFrame.withColumn(newTargetColName,
                                                  col(targetColumn) * col("InflConversionFactor"))
     return spark_dataFrame
+
+
+    def yearly_returns(df):    
+    '''
+    Desc: 
+      function that outputs yearly returns
+    Inpt:
+      df [df]: input dataframe
+    Oupt:
+      [df]: dataframe of yearly returns 
+    '''
+    return (df.iloc[-1] / df.iloc[0]) - 1

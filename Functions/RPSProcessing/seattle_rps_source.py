@@ -10,7 +10,8 @@ countDistinct, lag
 from pyspark.sql.types import DateType
 from pyspark.ml.feature import Bucketizer
 
-def removePartialStrings(spark_dataFrame = rps_spark, stringVector = corpEntityFlag,
+# spark_dataFrame = rps_spark, stringVector = corpEntityFlag
+def removePartialStrings(spark_dataFrame, stringVector,
                          target_name = "BuyerName"):
     '''
     Desc:
@@ -32,9 +33,10 @@ def removePartialStrings(spark_dataFrame = rps_spark, stringVector = corpEntityF
 
 
 
-
-def subsetMerge(spark_dataFrame1 = rb_spark, spark_dataFrame2 = rps_spark,
-                keepColumns = rbVec, joinColumns = joinVec):
+# spark_dataFrame1 = rb_spark, spark_dataFrame2 = rps_spark,
+#                keepColumns = rbVec, joinColumns = joinVec)
+def subsetMerge(spark_dataFrame1, spark_dataFrame2,
+                keepColumns, joinColumns):
     '''
     Desc:
       Given two data frames and multiple columns to inner join on,
@@ -53,8 +55,8 @@ def subsetMerge(spark_dataFrame1 = rb_spark, spark_dataFrame2 = rps_spark,
     return merged_spark_dataframe
 
 
-
-def calculateBins(merged_dataFrame = people_rb_spark, targetColumn = "SqFtTotLiving"):
+# merged_dataFrame = people_rb_spark,
+def calculateBins(merged_dataFrame, targetColumn = "SqFtTotLiving"):
     '''
     Desc:
         Given data frame and square footage column of real estate properties,

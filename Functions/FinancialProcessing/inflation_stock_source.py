@@ -1,4 +1,19 @@
-def createTickerDf(tickers = tickers, startYear = '2007-01-01', endYear = '2019-12-31'):
+import pyspark
+import re
+import os
+import pandas_datareader as pdf
+import pandas as pd
+from pyspark.sql import SparkSession, Window
+from pyspark.sql.functions import col, from_unixtime, lower as _lower, first, unix_timestamp, \
+year, mean as _mean, concat, regexp_replace, trim, lit, when, length, substring, sum as _sum, \
+countDistinct, lag
+from pyspark.sql.types import DateType
+from pyspark.ml.feature import Bucketizer
+
+
+
+# tickers = tickers
+def createTickerDf(tickers, startYear = '2007-01-01', endYear = '2019-12-31'):
     '''
     Desc: 
       This function takes in a vector of stock tickers to merge into a data frame 
@@ -8,14 +23,16 @@ def createTickerDf(tickers = tickers, startYear = '2007-01-01', endYear = '2019-
     Oupt:
       - mergeDf [df]: data frame of stock tickers and adjust price and volume values
     '''
+    import pandas_datareader as pdf
     dataFrame = pdf.get_data_yahoo(tickers, start = startYear, end = endYear)
     stock_dataFrame = dataFrame[['Adj Close', 'Volume']]
     stock_dataFrame['Years'] = stock_dataFrame.index.year
     return stock_dataFrame
 
+# spark_dataFrame = rps_spark, spark = spark
+def yearlyInflationRef(spark_dataFrame, spark, startYear = 2007, columnYearName = "Years",
+                       targetColumn = "SalePrice", inflationYear = 2019):
 
-def yearlyInflationRef(startYear = 2007, spark_dataFrame = rps_spark, columnYearName = "Years",
-                       targetColumn = "SalePrice", inflationYear = 2019, spark = spark):
     '''
     Desc:
       Given data frame of prices and corresponding year of price, convert

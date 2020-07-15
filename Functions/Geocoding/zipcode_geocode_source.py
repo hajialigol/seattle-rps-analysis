@@ -10,7 +10,8 @@ countDistinct, lag
 from pyspark.sql.types import DateType
 from pyspark.ml.feature import Bucketizer
 
-def standardizeZipcode(spark_dataFrame = people_rb_spark, targetColumn = "ZipCode", removeStatus = "Y"):
+# spark_dataFrame = people_rb_spark,
+def standardizeZipcode(spark_dataFrame, targetColumn = "ZipCode", removeStatus = "Y"):
     '''
     Desc:
       Given a data frame with a zip code column, standardize zipcodes
@@ -43,7 +44,8 @@ def standardizeZipcode(spark_dataFrame = people_rb_spark, targetColumn = "ZipCod
     return spark_dataFrame
 
 
-def geocodeZipcode(people_dataFrame = people_rb_spark, zipcode_dataFrame = zipcodes, 
+# people_dataFrame = people_rb_spark, zipcode_dataFrame = zipcodes
+def geocodeZipcode(people_dataFrame , zipcode_dataFrame, 
                    targetColumn = "ZipCode"):
     '''
     Desc:

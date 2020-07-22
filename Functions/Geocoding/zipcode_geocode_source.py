@@ -45,7 +45,7 @@ def standardizeZipcode(spark_dataFrame, targetColumn = "ZipCode", removeStatus =
 
 
 # people_dataFrame = people_rb_spark, zipcode_dataFrame = zipcodes
-def geocodeZipcode(people_dataFrame , zipcode_dataFrame, 
+def geocodeZipcode(people_dataFrame, zipcode_dataFrame, 
                    targetColumn = "ZipCode"):
     '''
     Desc:
@@ -60,7 +60,7 @@ def geocodeZipcode(people_dataFrame , zipcode_dataFrame,
     
     # Change the column name to match with the Zipcode column in the dataFrame
     # so you can merge the two this will bring in the lat/longs needed to plot
-    zipcode_dataFrame = zipcode_dataFrame.withColumnRenamed("zip", targetColumn
+    zipcode_dataFrame = zipcode_dataFrame.withColumnRenamed("zip", targetColumn)
                                                             
     # Merge the data frames together
     zipcode_dataFrame = people_dataFrame.join(other = zipcode_dataFrame, on = targetColumn,

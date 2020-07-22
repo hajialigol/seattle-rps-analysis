@@ -24,11 +24,11 @@ def removePartialStrings(spark_dataFrame, stringVector,
     Oupt:
       - dataFrame [df]: subsetted pyspark data frame
     '''
-    spark_dataFrame = spark_dataFrame.withColumn(target_name, trim(lower(col(target_name))))
+    spark_dataFrame = spark_dataFrame.withColumn(target_name, trim(_lower(col(target_name))))
+    
     for unwanted_value in stringVector:
-        spark_dataFrame = spark_dataFrame.withColumn(target_name,
-                                                     regexp_replace(col(target_name),
-                                                     unwanted_value, ""))
+        spark_dataFrame = spark_dataFrame.filter(~(col(target_name).contains(unwanted_value)))
+
     return spark_dataFrame    
 
 
@@ -49,7 +49,7 @@ def subsetMerge(spark_dataFrame1, spark_dataFrame2,
     Oupt:
       - merged_spark_dataframe [df]: merged and potentially subsetted pyspark df
     '''
-    subset_dataFrame1 = spark_dataFrame1.select(rbVec)
+    subset_dataFrame1 = spark_dataFrame1.select(keepColumns)
     merged_spark_dataframe = subset_dataFrame1.join(other = spark_dataFrame2,
                                                     on = joinColumns, how = "inner")
     return merged_spark_dataframe

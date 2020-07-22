@@ -5,14 +5,10 @@ import pandas_datareader as pdf
 import pandas as pd
 from pyspark.sql import SparkSession, Window
 from pyspark.sql.functions import col, from_unixtime, lower as _lower, first, unix_timestamp, \
-year, mean as _mean, concat, regexp_replace, trim, lit, when, length, substring, sum as _sum, \
-countDistinct, lag, stddev as _stddev
+year, mean as _mean, concat, corr, regexp_replace, trim, lit, when, length, substring, sum as _sum, \
+countDistinct, lag, stddev as _stddev, count
 from pyspark.sql.types import DateType
 from pyspark.ml.feature import Bucketizer
-from Functions.FinancialProcessing import inflation_stock_source
-from Functions.Geocoding import zipcode_geocode_source
-from Functions.RPSProcessing import seattle_rps_source
-from Functions.Analytics import price_integral_source
 
 # Global variables
 latest_date = "" # Enter date here
@@ -49,17 +45,23 @@ rps_spark = rps_spark.filter((col("DocumentDate") > '2007-01-01') & (col("Docume
 rps_spark = rps_spark.withColumn("Years", year("DocumentDate"))
 
 os.chdir(r"C:\Users\15712\Documents\GitHub Projects\seattle-rps-analysis")
+from Functions.FinancialProcessing import inflation_stock_source
+from Functions.Geocoding import zipcode_geocode_source
+from Functions.RPSProcessing import seattle_rps_source
+from Functions.Analytics import price_integral_source
 
+# Get yearly inflation rate
 rps_spark = inflation_stock_source.yearlyInflationRef(spark_dataFrame=rps_spark, 
                                           spark=spark)
 
+# Create set of strings to filter from buyer's name
 corpEntityFlag = {" corp.", " co.", " corp ", " co ", "corporation",
-                  " llc.", "llc. ", " llc ", "llc.", "llc", "l l c", "l.l.c",
-                  " inc.", " inc. ", " inc ", " inc", "incorporated",
-                  " holdings ", " holdings",
-                  " trust ", " trust", "trustee",
-                  " ltd.", " ltd", " ltd.", "limited",
-                  " bank", " city", " seattle"}
+                      " llc.", "llc. ", " llc ", "llc.", "llc", "l l c", "l.l.c",
+                      " inc.", " inc. ", " inc ", " inc", "incorporated",
+                      " holdings ", " holdings",
+                      " trust ", " trust", "trustee",
+                      " ltd.", " ltd", " ltd.", "limited",
+                      " bank", " city", " seattle"}
 
 # Remove transactions with buyers who have any of the above corporate flags
 rps_spark = seattle_rps_source.removePartialStrings(spark_dataFrame = rps_spark, stringVector = corpEntityFlag)
@@ -102,21 +104,22 @@ people_rb_spark = zipcode_geocode_source.geocodeZipcode(people_dataFrame = peopl
 # Calculate bins of total sq ft
 people_geo_spark = seattle_rps_source.calculateBins(merged_dataFrame = people_rb_spark)
 
-
+# Create PPSqFt column
 people_geo_spark = people_geo_spark.withColumn("PPSqFt", col(filter_string) / col("SqFtTotLiving"))
 
 # Create a grouped data frame for these parameters:
-#   - SqFtTotLiving_Bins within each Zipcode
-#   - Broken out by years
-#   ex: 2007-2019 SqFt Bins by each zipcode
-#       - Note: Summarize the total transaction volume and average 
+#		- SqFtTotLiving_Bins within each Zipcode
+#		- Broken out by years
+#		ex: 2007-2019 SqFt Bins by each zipcode
+#				- Note: Summarize the total transaction volume and average 
   
 # First group by zipcode -> sqftbins -> years
-spark_group = people_geo_spark.groupby("ZipCode", "Bedrooms", "Years").agg(length(first("Address")),
-                                                            _mean(filter_string).alias("Average Sale"),
-                                                            _mean("PPSqFt").alias("AvgPPSqFt"))
-spark_group = spark_group.withColumnRenamed("length(first(Address, false))", "Total Volume")
-
+# First group by zipcode -> sqftbins -> years
+# address_window = window.partitionBy('Address')
+spark_group = people_geo_spark.groupby("ZipCode", "Bedrooms", "Years").agg(count("Address"). \
+                                                                           alias("Total Volume"),
+                                                                           _mean(filter_string).alias("Average Sale"),
+                                                                           _mean("PPSqFt").alias("AvgPPSqFt"))
 
 # Calculate the difference columns within each group 
 window = Window.partitionBy('ZipCode', 'Bedrooms').orderBy('Years')
@@ -124,10 +127,12 @@ spark_group = spark_group.withColumn("DiffVol", (col("Total Volume") \
                                       - lag(col("Total Volume")).over(window)) \
                                       / lag(col("Total Volume")).over(window))
 
+# Compute average difference in sales
 spark_group = spark_group.withColumn("DiffAvgSale", (col("Average Sale") \
                                      - lag(col("Average Sale")).over(window)) \
                                      / lag(col("Average Sale")).over(window))
 
+# Create total volume groupping and count years columns
 temp_group = spark_group.orderBy(col("Years")) \
                                  .groupby("ZipCode", "Bedrooms") \
                                  .agg(_sum(col("Total Volume")) \
@@ -135,7 +140,7 @@ temp_group = spark_group.orderBy(col("Years")) \
                                  countDistinct(col("Years")) \
                                  .alias("CountYears"))
 
-
+# Inner-join data frames based on zipcode and bedrooms
 spark_group_combined = spark_group.join(temp_group, on = ['ZipCode', 'Bedrooms'], how = 'inner')
 
 # Now order the data set
@@ -149,18 +154,30 @@ spark_group_combined = spark_group_combined.filter((col("CountYears") == int(scr
 # Create data frame of stock tickers
 tickers = ["ALK", "AMZN", 'BA', 'EXPE', 'JWN', 'MSFT', 'SBUX']
 
-spark_stockDf = inflation_stock_source.createTickerDf(tickers = tickers)
+# Fetch stock data frame
+stockDf = inflation_stock_source.createTickerDf(tickers = tickers)
 
-stockDfYrReturn = (spark_stockDf.groupby("Years").apply(inflation_stock_source.yearly_returns))['Adj Close']
-stockDfYrReturn['Years'] = stockDfYrReturn.index
+# Extract first year's returns
+first_year_returns = (stockDf.groupby("Years") \
+                   .apply(inflation_stock_source.yearly_returns))['Adj Close'].iloc[0]
 
-spark_stock = spark.createDataFrame(stockDfYrReturn)
+# Get every other year's returns
+yearly_stock_returns = stockDf['Adj Close'].resample('Y').ffill().pct_change()
+
+# Assign first year's returns to newly generated dataframe
+yearly_stock_returns.iloc[0] = first_year_returns
+
+# Create year column
+yearly_stock_returns['Years'] = yearly_stock_returns.index.year
+
+# Convert stock data frame to Spark
+spark_stock = spark.createDataFrame(yearly_stock_returns)
+
+# Join two Spark data frames
 analysis_spark = spark_group_combined.join(other = spark_stock, on = "Years", how = "inner")
 
-spark_group_combined = spark_group.join(temp_group, on = ['ZipCode', 'Bedrooms'], how = 'inner')
-
 # Remove groups where there is less than n# for the years count
-spark_group_combined = spark_group_combined.filter((col("CountYears") == int(script_end_year) - 2007 + 1) \
+analysis_spark = analysis_spark.filter((col("CountYears") == int(script_end_year) - 2007 + 1) \
                                  & (col("TotalVolumeGrouping") > 100) \
                                  & (col("Years") != 2007))
 
@@ -168,24 +185,29 @@ spark_group_combined = spark_group_combined.filter((col("CountYears") == int(scr
 # year for all years 2008 - current year
 keep = analysis_spark.columns[:10]
 
+# Melt the analysis data frame
 analysis_melt = price_integral_source.melt(df = analysis_spark, id_vars = keep, var_name = "Stocks",
                      value_name = "DiffAvgPrice", value_vars = tickers)
 
+# Update "UID" column to include zipcode, bedroom, and stock information
 analysis_melt = analysis_melt.withColumn("UID", concat(col("ZipCode"), lit("-"), col("Bedrooms"),
                                  lit("-"), col("Stocks")))
 
-# test = analysis_melt.groupby("UID").agg(_stddev(col("DiffAvgSale")).alias("stddev_DiffAvgSale"),
-#                                  _mean(col("DiffAvgSale")).alias("mean_DiffAvgSale"))
-temp_analysis_melt = analysis_melt.groupby("UID").agg(_stddev(col("DiffAvgPrice")).alias("stddev_DiffAvgPrice"),
-                               _mean(col("DiffAvgPrice")).alias("mean_DiffAvgPrice"),
-                               _stddev(col("DiffAvgSale")).alias("stddev_DiffAvgSale"),
-                               _mean(col("DiffAvgSale")).alias("mean_DiffAvgSale"))
+# Create temporary data frame to compute mean difference in average sales and price
+temp_analysis_melt = analysis_melt.groupby("UID").agg(_mean(col("DiffAvgPrice")). \
+                                                      alias("mean_DiffAvgPrice"),
+                                                       _mean(col("DiffAvgSale")). \
+                                                      alias("mean_DiffAvgSale"))
+
+# Join the analysis_melt data frame and the temporary data frame
 analysis_melt = analysis_melt.join(temp_analysis_melt, on = "UID", how = 'inner')
 
-analysis_melt = analysis_melt.withColumn("DiffAvgPrice_S", (col("DiffAvgPrice") - col("mean_DiffAvgPrice")) \
-                 /col("stddev_DiffAvgPrice"))
-analysis_melt = analysis_melt.withColumn("DiffAvgSale_S", (col("DiffAvgSale") - col("mean_DiffAvgSale")) \
-                 /col("stddev_DiffAvgSale"))
+# Scale difference in average price
+analysis_melt = analysis_melt.withColumn("DiffAvgPrice_S", (col("DiffAvgPrice") - \
+                                                            col("mean_DiffAvgPrice")))
 
-analysis_melt = analysis_melt.drop('stddev_DiffAvgSale').drop('mean_DiffAvgSale') \
-             .drop('stddev_DiffAvgPrice').drop('mean_DiffAvgPrice')                                                  
+# Scale difference in average sales
+analysis_melt = analysis_melt.withColumn("DiffAvgSale_S", (col("DiffAvgSale") - \
+                                                           col("mean_DiffAvgSale"))) 
+# Drop intermediate columns
+analysis_melt = analysis_melt.drop('mean_DiffAvgSale').drop('mean_DiffAvgPrice')

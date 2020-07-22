@@ -41,7 +41,7 @@ def integral_analysis(df, startYear, endYear):
     '''
 
     correlation_df = df.groupby("UID").agg(corr('DiffAvgSale_S', 'DiffAvgPrice_S').alias("Correlation"))
-    df = df.join(other = correlation, on = "UID", how = "inner")
+    df = df.join(other = correlation_df, on = "UID", how = "inner")
 
     # Loop through each unique identifier of real estate properties and calculate
     # integral and correlation for each UID

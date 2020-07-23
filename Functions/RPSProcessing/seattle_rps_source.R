@@ -14,21 +14,23 @@ require(data.table)
 removePartialStrings <- function(dataFrame, stringVector, targetColumn){
   
   require(qdapRegex)
+  require(stringr)
   
   # Standardize string column to lowercase with no extra white space
-  dataFrame[[targetColumn]] <- tolower(dataFrame[[targetColumn]])
-  dataFrame[[targetColumn]] <- rm_white_multiple(dataFrame[[targetColumn]])
+  dataFrame <- dataFrame %>%
+    mutate("BuyerName" = trimws(tolower(BuyerName)))
   stringVector <- tolower(stringVector)
   
   # Loop through vector of unwanted values and filter data set each iteration
-  for (i in stringVector){
-
-    # Remove transactions for seller name  
-    dataFrame <- dataFrame[!grepl(i, dataFrame[[targetColumn]]),]
+  for (unwanted_word in stringVector){
     
-  }
+    # Remove transactions for seller name  
+    dataFrame <- dataFrame %>%
+      filter(!rlike(!!as.name(targetColumn), unwanted_word))
   
-  return(dataFrame)
+  }  
+  
+  return (dataFrame)
   
 }
 
@@ -44,16 +46,18 @@ removePartialStrings <- function(dataFrame, stringVector, targetColumn){
 # Oupt:
 #   - mergeDataFrame [df]: merged and potentially subsetted df
 subsetMerge <- function(dataFrame1, dataFrame2, keepColumns, joinColumns){
-
+  
   require(dplyr)
-
+  
   # Subset the columns down to what the user specifies in 'keepColumns'
-  subDataFrame1 <- subset(dataFrame1, select = keepColumns)
+  subDataFrame1 <- dataFrame1 %>% select(keepColumns)
+  
   # inner_join data sets together
   mergeDataFrame <- subDataFrame1 %>% inner_join(dataFrame2, by = joinColumns)
+  
   # return back to user
   return(mergeDataFrame)
-
+  
 }
 
 
@@ -68,26 +72,14 @@ subsetMerge <- function(dataFrame1, dataFrame2, keepColumns, joinColumns){
 calculateBins <- function(dataFrame, targetColumn){
   
   newColName <- paste0(targetColumn, "_Bins")
-  dataFrame[[newColName]] <- NA
   
-  dataFrame[[newColName]][dataFrame[[targetColumn]] <= 1000] <- 1
-  dataFrame[[newColName]][dataFrame[[targetColumn]] > 1000 & dataFrame[[targetColumn]] <= 2000] <- 2
-  dataFrame[[newColName]][dataFrame[[targetColumn]] > 2000 & dataFrame[[targetColumn]] <= 3000] <- 3
-  dataFrame[[newColName]][dataFrame[[targetColumn]] > 3000 & dataFrame[[targetColumn]] <= 4000] <- 4
-  dataFrame[[newColName]][dataFrame[[targetColumn]] > 4000 & dataFrame[[targetColumn]] <= 5000] <- 5
-  dataFrame[[newColName]][dataFrame[[targetColumn]] > 5000 ] <- 6
+  dataFrame <- dataFrame %>%
+    mutate(!!as.name(newColName) := case_when(!!as.name(targetColumn) <= 1000 ~ 1,
+                                             (!!as.name(targetColumn) > 1000 && !!as.name(targetColumn) <= 2000) ~ 2,
+                                             (!!as.name(targetColumn) > 2000 && !!as.name(targetColumn) <= 3000) ~ 3,
+                                             (!!as.name(targetColumn) > 3000 && !!as.name(targetColumn) <= 4000) ~ 4,
+                                             (!!as.name(targetColumn) > 4000 && !!as.name(targetColumn) <= 5000) ~ 5,
+                                             (!!as.name(targetColumn) > 5000) ~ 6))
   
-  return(dataFrame)
-  
-}
-
-# Desc:
-#   Function to scale a vector of numeric values
-# Inpt:
-#   - x [vec]: vector of numeric values to scale
-# Oupt: 
-#   - [vec]: scaled vector
-written_scale <- function(x){
-  #(x - mean(x, na.rm = TRUE))/sd(x, na.rm=TRUE)
-  scale(x, scale = FALSE)
+  return (dataFrame)
 }

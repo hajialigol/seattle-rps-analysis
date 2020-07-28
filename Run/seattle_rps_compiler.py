@@ -11,8 +11,24 @@ from pyspark.sql.types import DateType
 from pyspark.ml.feature import Bucketizer
 
 
-def seattle_rps_source(rps_spark, rb_spark, zipcodes, latest_date,
+def seattle_rps_compiler(rps_spark, rb_spark, zipcodes, latest_date,
                          save_wd, save_df, spark):
+    """
+    Desc:
+      Given seattle real estate data sets and user preferences, analyze the data and output data and 
+      charts of the analysis.  This is a compiler script of all the source functions and other 
+      necessary processes.
+    Inpt:
+      rps_spark [df]: Seattle RPS data set
+      rb_spark [df]: Seattle Residential Building data set
+      zipcode [df]: Data set of all zipcodes
+      latest_date [str]: string format of latest date to run analysis through in YYYY-mm-dd format
+      save_wd [str]: working directory to save output data frame
+      save_df [str]: string stating whether to save data frame or not ('y' or 'n')
+      spark [spark]: Spark session object
+    Oupt:
+      finalDf [df]: final data set from analysis
+    """
 
     # Import analysis and preprocessing functions
     from FinancialProcessing import inflation_stock_source
@@ -200,7 +216,14 @@ def seattle_rps_source(rps_spark, rb_spark, zipcodes, latest_date,
                                                                col("mean_DiffAvgSale"))) 
     # Drop intermediate columns
     analysis_melt = analysis_melt.drop('mean_DiffAvgSale').drop('mean_DiffAvgPrice')
+    
+    # Correlation
+    correlation_df = analysis_melt.groupby('UID').agg(corr("DiffAvgSale_S", "DiffAvgPrice_S") \
+                                                  .alias("Correlation"))
+
+    # Join data frames to get correlation values
+    analysis = analysis_melt.join(other = correlation_df, on = 'UID', how = 'inner')
 
     # Save data frame if desired
-    if (lower(save_df) == 'y'):
-      analysis_melt.toPandas().to_csv("final_df.csv")        
+    if (str.lower(save_df) == 'y'):
+      analysis.toPandas().to_csv("final_dataframe.csv")        

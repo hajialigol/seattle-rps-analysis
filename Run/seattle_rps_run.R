@@ -2,38 +2,36 @@
 # Remove all variables
 rm(list=ls())
 
-# load Spark library
-library(sparklyr)
+# Load libraries
+require(sparklyr)
 
 # Preset Variables for run script
-latest_date = "" # Enter date here
+latest_date = "2019/12/31" # Enter date here
 save_wd = ""
 data_wd = ""
 connection_type = ""
 
 # Load all source script functions
-source("~/GitHub/seattle-rps-analysis/Functions/FinancialProcessing/inflation_stock_source.R")
-source("~/GitHub/seattle-rps-analysis/Functions/Geocoding/zipcode_geocode_source.R")
-source("~/GitHub/seattle-rps-analysis/Functions/RPSProcessing/seattle_rps_source.R")
-source("~/GitHub/seattle-rps-analysis/Functions/Analytics/price_integral_source.R")
-source("~/GitHub/seattle-rps-analysis/Functions/Visualizations/price_comparison_source.R")
-source("~/GitHub/seattle-rps-analysis/Run/seattle_rps_compiler.R")
-
-# Load in data to start for full-run
-setwd(data_wd)
-
+source("~/GitHub Projects/seattle-rps-analysis/Functions/FinancialProcessing/inflation_stock_source.R")
+source("~/GitHub Projects/seattle-rps-analysis/Functions/Geocoding/zipcode_geocode_source.R")
+source("~/GitHub Projects/seattle-rps-analysis/Functions/RPSProcessing/seattle_rps_source.R")
+source("~/GitHub Projects/seattle-rps-analysis/Functions/Analytics/price_integral_source.R")
+source("~/GitHub Projects/seattle-rps-analysis/Run/seattle_rps_compiler.R")
 
 # Set Spark connection
 sc <- spark_connect(master = connection_type)
 
-# Initial Processing
-rpsDf <- read.csv("EXTR_RPSale.csv", stringsAsFactors = FALSE)
-rbDf <- read.csv("EXTR_ResBldg.csv", stringsAsFactors = FALSE)
+# Set working directory to data directory
+setwd(data_wd)
 
+# Initial Processing
+rpsDf <- read.csv("EXTR_RPSale.csv", stringsAsFactors = FALSE, nrows = 200000)
+rbDf <- read.csv("EXTR_ResBldg.csv", stringsAsFactors = FALSE, nrows = 200000)
+
+# Convert to Spark
 rps_spark <- copy_to(sc, rpsDf)
 rb_spark <- copy_to(sc, rbDf)
 
-seattle_rps_compiler(rpsDf = rpsDf, rbDf = rbDf, 
-                     latest_date = latest_date, topN = 10, 
-                     save_wd = save_wd, data_wd = data_wd, 
-                     visuals = 'y', save_df = 'y')
+# Run program
+seattle_rps_compiler(rps_spark = rps_spark, rb_spark = rb_spark, sc = sc,
+                     latest_date = latest_date)
